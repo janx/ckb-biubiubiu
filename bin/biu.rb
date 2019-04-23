@@ -14,14 +14,12 @@ def get_always_success_lock_hash
   CKB::Utils.json_script_to_type_hash(always_success_lock)
 end
 
-def get_always_success_cellbase(api, from, to)
+def get_always_success_cellbases(api, from, to)
   lock_hash = get_always_success_lock_hash
-  cells = api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:capacity] == 50000 }
-  cells.sample
+  api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:capacity] == 50000 }
 end
 
-def spend_always_success_cell(api, from, to)
-  cell = get_always_success_cellbase(api, from, to)
+def spend_always_success_cell(api, cell)
   puts "spending: #{cell}"
 
   outnum = 10
@@ -57,8 +55,7 @@ def spend_always_success_cell(api, from, to)
   api.send_transaction(tx.to_h)
 end
 
-def explode_always_success_cell(api, from, to, factor)
-  cell = get_always_success_cellbase(api, from, to)
+def explode_always_success_cell(api, cell, factor)
   puts "spending: #{cell}"
 
   inputs = [
@@ -125,23 +122,31 @@ def biubiubiu_jan_cells(api, from, to)
     txs.push tx
   end
 
+  txids = []
   puts "sending #{txs.size} transactions ..."
   txs.each_with_index do |tx, i|
     puts "sending tx #{i}/#{txs.size} ..."
-    api.send_transaction(tx.to_h)
+    begin
+      txids << api.send_transaction(tx.to_h)
+    rescue
+      p $!
+    end
   end
   puts "all transactions sent!"
-  txs
+  txids
 end
 
 def explode(api, from, to)
   txs = []
+  cells = get_always_success_cellbases(api, from, to)
   30.times do
     tip = api.get_tip_header
     puts "\nBlock##{tip[:number]} #{tip[:hash]} #{Time.at(tip[:timestamp].to_i/1000.0)}"
 
     begin
-      txs << explode_always_success_cell(api, from, to, 600)
+      cell = cells.sample
+      cells.delete(cell)
+      txs << explode_always_success_cell(api, cell, 600)
     rescue
       p $!
     end
