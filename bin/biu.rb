@@ -151,7 +151,7 @@ def explode(api, from, to)
   p txs
 end
 
-def biubiu(api)
+def biubiu(api, from, to)
   txs = []
   tip = api.get_tip_header
   puts "\nBlock##{tip[:number]} #{tip[:hash]} #{Time.at(tip[:timestamp].to_i/1000.0)}"
