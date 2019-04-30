@@ -8,7 +8,7 @@ ALWAYS_SUCCESS_HASH = "0x0000000000000000000000000000000000000000000000000000000
 
 def get_always_success_lock_hash
   always_success_lock = {
-    binary_hash: ALWAYS_SUCCESS_HASH,
+    code_hash: ALWAYS_SUCCESS_HASH,
     args: []
   }
   CKB::Utils.json_script_to_type_hash(always_success_lock)
@@ -16,14 +16,14 @@ end
 
 def get_always_success_cellbases(api, from, to)
   lock_hash = get_always_success_lock_hash
-  api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:capacity] == 50000 }
+  api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:capacity] == "5000000000000" }
 end
 
 def spend_always_success_cell(api, cell)
   puts "spending: #{cell}"
 
   outnum = 10
-  cap = (cell[:capacity] - 100) / outnum
+  cap = (cell[:capacity].to_i - 100000000) / outnum
 
   inputs = [
     {
@@ -39,7 +39,7 @@ def spend_always_success_cell(api, cell)
       capacity: cap.to_s,
       data: CKB::Utils.bin_to_hex("LovePeace@#{i}"),
       lock: {
-        binary_hash: "0x0000000000000000000000000000000000000000000000000000000000000000", # no one can unlock
+        code_hash: "0x0000000000000000000000000000000000000000000000000000000000000000", # no one can unlock
         args: []
       }
     }
@@ -62,18 +62,18 @@ def explode_always_success_cell(api, cell, factor)
     {
       previous_output: cell[:out_point],
       args: [],
-      valid_since: "0"
+      since: "0"
     }
   ]
 
-  cap = (cell[:capacity] / factor).to_s
+  cap = (cell[:capacity].to_i / factor).to_s
   outputs = []
   factor.times do |i|
     outputs << {
       capacity: cap,
       data: CKB::Utils.bin_to_hex("jan#{i}"),
       lock: {
-        binary_hash: ALWAYS_SUCCESS_HASH,
+        code_hash: ALWAYS_SUCCESS_HASH,
         args: []
       }
     }
@@ -91,7 +91,7 @@ end
 
 def biubiubiu_jan_cells(api, from, to)
   lock_hash = get_always_success_lock_hash
-  cells = api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:capacity] < 1000 }
+  cells = api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:capacity].to_i < 100000000000 }
 
   txs = []
   cells.each do |cell|
@@ -99,7 +99,7 @@ def biubiubiu_jan_cells(api, from, to)
       {
         previous_output: cell[:out_point],
         args: [],
-        valid_since: "0"
+        since: "0"
       }
     ]
     outputs = [
@@ -107,7 +107,7 @@ def biubiubiu_jan_cells(api, from, to)
         capacity: cell[:capacity].to_s,
         data: CKB::Utils.bin_to_hex(""),
         lock: {
-          binary_hash: ALWAYS_SUCCESS_HASH,
+          code_hash: ALWAYS_SUCCESS_HASH,
           args: []
         }
       }
@@ -148,6 +148,7 @@ def explode(api, from, to)
       cells.delete(cell)
       txs << explode_always_success_cell(api, cell, 600)
     rescue
+      puts $!.backtrace
       p $!
     end
 

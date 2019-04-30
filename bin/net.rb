@@ -18,6 +18,7 @@ end
 
 tip = api.get_tip_header
 puts "\nBlock##{tip[:number]} #{tip[:hash]} #{Time.at(tip[:timestamp].to_i/1000.0)}"
+p api.send(:rpc_request, :tx_pool_info)
 
 #p api.send(:rpc_request, 'get_pool_transaction')
 
