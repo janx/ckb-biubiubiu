@@ -25,7 +25,7 @@ end
 
 def get_always_success_cellbases(api, from, to)
   lock_hash = get_always_success_lock_hash
-  api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:capacity] == "5000000000000" }
+  api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:out_point][:index] == 0 }
 end
 
 def spend_always_success_cell(api, cell)
