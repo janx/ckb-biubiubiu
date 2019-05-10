@@ -8,12 +8,12 @@ api = CKB::API.new
 
 local = api.local_node_info
 puts "[Local]"
-puts "#{local[:node_id]} #{local[:addresses][0][:address]}"
+puts "#{local.node_id} #{local.addresses[0].address}"
 
 peers = api.get_peers
 puts "\n[Peers] #{peers.size}"
 peers.each_with_index do |peer, i|
-  puts "(#{i}) #{peer[:node_id]} #{peer[:addresses][0][:address]}:#{peer[:addresses][0][:score]}"
+  puts "(#{i}) #{peer.node_id} #{peer.addresses[0].address}:#{peer.addresses[0].score}"
 end
 
 tip = api.get_tip_header.to_h

@@ -231,22 +231,44 @@ def biubiu_secp_cells(api, key1, key2, from, to)
       inputs: inputs,
       outputs: outputs
     )
-    txs.push _tx.sign(key1)
+    _tx_hash = api.compute_transaction_hash(_tx)
+    txs.push _tx.sign(key1, _tx_hash)
     puts "#{txs.size}/#{expected} transactions prepared"
   end
 
   txids = []
   puts "sending #{txs.size} transactions from #{addr1} to #{addr2} ..."
+  t1 = Time.now
   txs.each_with_index do |tx, i|
-    puts "sending tx #{i}/#{txs.size} ..."
+    puts "sending tx #{i+1}/#{txs.size} ..."
     begin
       txids << api.send_transaction(tx)
     rescue
       p $!
     end
   end
-  puts "all transactions sent!"
-  txids
+  t2 = Time.now
+
+  t3 = Time.now
+  puts "all transactions sent in #{t2 - t1} seconds! confirming..."
+  txids.each_with_index do |id, i|
+    loop do
+      _tx = api.get_transaction(id)
+      break if _tx.tx_status.status == 'committed'
+      sleep 1
+    end
+    t3 = Time.now if i == 0
+    puts "#{i+1}/#{txids.size} transactions committed"
+  end
+  t4 = Time.now
+  puts "all #{txids.size} transactions committed!"
+  puts "send: #{txids.size / (t2-t1).to_f}tx/s, used #{t2-t1} seconds"
+  puts "commit: #{txids.size / (t4-t3).to_f}tx/s, used #{t4-t3} seconds"
+  puts "avg: #{txids.size / (t4-t1).to_f}tx/s, #{t4-t1} seconds"
+
+  first = txids.first
+  last = txids.last
+  [first] + txids.sample(10) + [last]
 end
 
 def explode_vanilla(api, from, to)
@@ -310,8 +332,9 @@ def biubiu_secp(api, key1, key2, from, to)
   puts "\nBlock##{tip.number} #{tip.hash} #{Time.at(tip.timestamp.to_i/1000.0)}"
 
   begin
-    txs = biubiu_secp_cells(api, key1, key2, from, to).sample(10)
+    txs = biubiu_secp_cells(api, key1, key2, from, to)
   rescue
+    puts $!.backtrace
     p $!
   end
   p txs
