@@ -4,13 +4,12 @@ require 'rubygems'
 require 'bundler/setup'
 require 'ckb'
 
-ALWAYS_SUCCESS_HASH = "0x0000000000000000000000000000000000000000000000000000000000000001".freeze
+def get_miner_privkey
+  File.read("key").strip
+end
 
-def get_always_success_lock
-  CKB::Types::Script.new(
-    code_hash: ALWAYS_SUCCESS_HASH,
-    args: []
-  )
+def get_miner_key
+  CKB::Key.new(get_miner_privkey)
 end
 
 def get_secp_lock(api, key)
@@ -20,78 +19,9 @@ def get_secp_lock(api, key)
   )
 end
 
-def get_always_success_cellbases(api, from, to)
-  api.get_cells_by_lock_hash(get_always_success_lock.to_hash, from, to).select {|c| c.out_point.cell.index == 0 }
-end
-
-def spend_always_success_cell(api, cell)
-  puts "spending: #{cell}"
-
-  outnum = 10
-  cap = (cell[:capacity].to_i - 100000000) / outnum
-
-  inputs = [
-    {
-      previous_output: cell[:out_point],
-      args: [],
-      valid_since: "0"
-    }
-  ]
-
-  outputs = []
-  outnum.times do |i|
-    outputs << {
-      capacity: cap.to_s,
-      data: CKB::Utils.bin_to_hex("LovePeace@#{i}"),
-      lock: {
-        code_hash: "0x0000000000000000000000000000000000000000000000000000000000000000", # no one can unlock
-        args: []
-      }
-    }
-  end
-
-  tx = CKB::Transaction.new(
-    version: 0,
-    deps: [api.system_script_out_point],
-    inputs: inputs,
-    outputs: outputs
-  )
-  # no need to tx.sign
-  api.send_transaction(tx.to_h)
-end
-
-def explode_vanilla_cell(api, cell, factor)
-  puts "spending: #{cell}"
-
-  inputs = [
-    {
-      previous_output: cell[:out_point],
-      args: [],
-      since: "0"
-    }
-  ]
-
-  cap = (cell[:capacity].to_i / factor).to_s
-  outputs = []
-  factor.times do |i|
-    outputs << {
-      capacity: cap,
-      data: CKB::Utils.bin_to_hex("jan#{i}"),
-      lock: {
-        code_hash: ALWAYS_SUCCESS_HASH,
-        args: []
-      }
-    }
-  end
-
-  tx = CKB::Transaction.new(
-    version: 0,
-    deps: [api.system_script_out_point],
-    inputs: inputs,
-    outputs: outputs
-  )
-  # no need to tx.sign
-  api.send_transaction(tx.to_h)
+def get_cellbases(api, from, to)
+  miner_lock = get_secp_lock(api, get_miner_key)
+  api.get_cells_by_lock_hash(miner_lock.to_hash, from, to).select {|c| c.out_point.cell.index == 0 }
 end
 
 def explode_secp_cell(api, key, cell, factor)
@@ -106,7 +36,7 @@ def explode_secp_cell(api, key, cell, factor)
     )
   ]
 
-  cap = cell.capacity / factor
+  cap = cell.capacity.to_i / factor
   outputs = []
   factor.times do |i|
     outputs.push CKB::Types::Output.new(
@@ -119,60 +49,13 @@ def explode_secp_cell(api, key, cell, factor)
   end
 
   tx = CKB::Types::Transaction.new(
-    version: 0,
+    version: "0",
     deps: [api.system_script_out_point],
     inputs: inputs,
     outputs: outputs
   )
-  # no need to tx.sign
-  api.send_transaction(tx)
-end
-
-def biubiu_vanilla_cells(api, from, to)
-  lock_hash = get_always_success_lock_hash
-  cells = api.get_cells_by_lock_hash(lock_hash, from, to).select {|c| c[:capacity].to_i < 10000000000 }
-
-  txs = []
-  cells.each do |cell|
-    inputs = [
-      {
-        previous_output: cell[:out_point],
-        args: [],
-        since: "0"
-      }
-    ]
-    outputs = [
-      {
-        capacity: cell[:capacity].to_s,
-        data: CKB::Utils.bin_to_hex(""),
-        lock: {
-          code_hash: ALWAYS_SUCCESS_HASH,
-          args: []
-        }
-      }
-    ]
-
-    tx = CKB::Transaction.new(
-      version: 0,
-      deps: [api.system_script_out_point],
-      inputs: inputs,
-      outputs: outputs
-    )
-    txs.push tx
-  end
-
-  txids = []
-  puts "sending #{txs.size} transactions ..."
-  txs.each_with_index do |tx, i|
-    puts "sending tx #{i}/#{txs.size} ..."
-    begin
-      txids << api.send_transaction(tx.to_h)
-    rescue
-      p $!
-    end
-  end
-  puts "all transactions sent!"
-  txids
+  tx_hash = api.compute_transaction_hash(tx)
+  api.send_transaction tx.sign(get_miner_key, tx_hash)
 end
 
 def biubiu_secp_cells(api, key1, key2, from, to)
@@ -201,7 +84,7 @@ def biubiu_secp_cells(api, key1, key2, from, to)
       )
     ]
 
-    cap = cell1.capacity + cell2.capacity
+    cap = cell1.capacity.to_i + cell2.capacity.to_i
     fee = 50000
     r = [[rand, 0.35].max, 0.65].min
     cap1 = (cap * r).floor
@@ -226,7 +109,7 @@ def biubiu_secp_cells(api, key1, key2, from, to)
     ]
 
     _tx = CKB::Types::Transaction.new(
-      version: 0,
+      version: "0",
       deps: [api.system_script_out_point],
       inputs: inputs,
       outputs: outputs
@@ -271,43 +154,11 @@ def biubiu_secp_cells(api, key1, key2, from, to)
   [first] + txids.sample(10) + [last]
 end
 
-def explode_vanilla(api, from, to)
-  txs = []
-  cells = get_always_success_cellbases(api, from, to)
-  30.times do
-    tip = api.get_tip_header
-    puts "\nBlock##{tip.number} #{tip.hash} #{Time.at(tip.timestamp.to_i/1000.0)}"
-
-    begin
-      cell = cells.sample
-      cells.delete(cell)
-      txs << explode_vanilla_cell(api, cell, 600)
-    rescue
-      puts $!.backtrace
-      p $!
-    end
-
-    sleep 1
-  end
-  p txs
-end
-
-def biubiu_vanilla(api, from, to)
-  txs = []
-  tip = api.get_tip_header
-  puts "\nBlock##{tip.number} #{tip.hash} #{Time.at(tip.timestamp.to_i/1000.0)}"
-
-  begin
-    txs = biubiu_vanilla_cells(api, from, to).sample(10)
-  rescue
-    p $!
-  end
-  p txs
-end
-
 def explode_secp(api, key, from, to)
   txs = []
-  cells = get_always_success_cellbases(api, from, to)
+  cells = get_cellbases(api, from, to)
+  factor = cells.first.capacity.to_i / 10**8 / 125
+
   30.times do
     tip = api.get_tip_header
     puts "\nBlock##{tip.number} #{tip.hash} #{Time.at(tip.timestamp.to_i/1000.0)}"
@@ -315,7 +166,7 @@ def explode_secp(api, key, from, to)
     begin
       cell = cells.sample
       cells.delete(cell)
-      txs << explode_secp_cell(api, key, cell, 400)
+      txs << explode_secp_cell(api, key, cell, factor)
     rescue
       puts $!.backtrace
       p $!
@@ -345,24 +196,10 @@ key1 = CKB::Key.new("0x1eacee209907437318085d33295fcc721a383f17d4580c76ffc3b6210
 key2 = CKB::Key.new("0xd51fc5a0d6c1aa5a71af04584e413fdba77185069b3980e5ecf361bd05950fcc")
 #wallet = CKB::Wallet.new(api, key)
 
-if ARGV[0] == 'explode_vanilla'
-  explode_vanilla(api, ARGV[1], ARGV[2])
-elsif ARGV[0] == 'biubiu_vanilla'
-  biubiu_vanilla(api, ARGV[1], ARGV[2])
-elsif ARGV[0] == 'explode_secp'
+if ARGV[0] == 'explode_secp'
   explode_secp(api, key1, ARGV[1], ARGV[2])
 elsif ARGV[0] == 'biubiu_secp'
   biubiu_secp(api, key1, key2, ARGV[1], ARGV[2])
 elsif ARGV[0] == 'generate_key'
   p CKB::Key.random_private_key
 end
-
-#loop do
-#  txs.each do |tx|
-#    puts "\n[#{Time.now}] Check tx status ... #{tx}"
-#    p api.send(:rpc_request, 'get_pool_transaction', params: [tx])
-#    p api.get_transaction(tx)
-#  end
-#
-#  sleep 1
-#end

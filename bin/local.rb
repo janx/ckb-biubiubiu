@@ -13,5 +13,5 @@ local = CKB::API.new
 #p blk[:commit_transactions][0]
 #p blk[:commit_transactions][1]
 
-p local.send :rpc_request, ARGV[0], params: ARGV[1..-1]
+p local.rpc.send :rpc_request, ARGV[0], params: ARGV[1..-1]
 
