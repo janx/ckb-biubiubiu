@@ -16,10 +16,14 @@ peers.each_with_index do |peer, i|
   puts "(#{i}) #{peer.node_id} #{peer.addresses[0].address}:#{peer.addresses[0].score}"
 end
 
-tip = api.get_tip_header.to_h
-puts "\nBlock##{tip[:number]} #{tip[:hash]} #{Time.at(tip[:timestamp].to_i/1000.0)}"
-p api.tx_pool_info
+puts "\n"
 p api.get_current_epoch.to_h
+
+tip = api.get_tip_header
+blk = api.get_block tip.hash
+pool = api.tx_pool_info
+puts "\nBlock##{tip.number} #{tip.hash} #{Time.at(tip.timestamp.to_i/1000.0)}"
+puts "Transactions pending:#{pool.pending} proposed:#{pool.proposed} committed:#{blk.transactions.size} orphan:#{pool.orphan}"
 
 #p api.send(:rpc_request, 'get_pool_transaction')
 

@@ -26,7 +26,7 @@ end
 
 def explode_secp_cell(api, key, cell, factor)
   addr = key.address.generate
-  puts "spending cell #{cell} to addr: #{addr}"
+  puts "explode cellbase #{cell} to #{factor} cells at address #{addr}"
 
   inputs = [
     CKB::Types::Input.new(
@@ -61,7 +61,7 @@ end
 def biubiu_secp_cells(api, key1, key2, from, to)
   addr1 = key1.address.generate
   addr2 = key2.address.generate
-  cells = api.get_cells_by_lock_hash(get_secp_lock(api, key1).to_hash, from, to)
+  cells = api.get_cells_by_lock_hash(get_secp_lock(api, key1).to_hash, from, to).shuffle
 
   txs = []
   expected = cells.size / 2
@@ -159,7 +159,7 @@ def explode_secp(api, key, from, to)
   cells = get_cellbases(api, from, to)
   factor = cells.first.capacity.to_i / 10**8 / 125
 
-  30.times do
+  90.times do
     tip = api.get_tip_header
     puts "\nBlock##{tip.number} #{tip.hash} #{Time.at(tip.timestamp.to_i/1000.0)}"
 
