@@ -4,12 +4,20 @@ require 'rubygems'
 require 'bundler/setup'
 require 'ckb'
 
-def get_miner_privkey
-  File.read("key").strip
+def get_privkey(name)
+  File.read(name).strip
 end
 
-def get_miner_key
-  CKB::Key.new(get_miner_privkey)
+def miner_key
+  @_miner_key ||= CKB::Key.new(get_privkey("key"))
+end
+
+def key1
+  @_key1 ||= CKB::Key.new(get_privkey("key1"))
+end
+
+def key2
+  @_key2 ||= CKB::Key.new(get_privkey("key2"))
 end
 
 def get_secp_lock(api, key)
@@ -20,7 +28,7 @@ def get_secp_lock(api, key)
 end
 
 def get_cellbases(api, from, to)
-  miner_lock = get_secp_lock(api, get_miner_key)
+  miner_lock = get_secp_lock(api, miner_key)
   api.get_cells_by_lock_hash(miner_lock.to_hash, from, to).select {|c| c.out_point.cell.index == 0 }
 end
 
@@ -55,7 +63,7 @@ def explode_secp_cell(api, key, cell, factor)
     outputs: outputs
   )
   tx_hash = api.compute_transaction_hash(tx)
-  api.send_transaction tx.sign(get_miner_key, tx_hash)
+  api.send_transaction tx.sign(miner_key, tx_hash)
 end
 
 def biubiu_secp_cells(api, key1, key2, from, to)
@@ -192,8 +200,6 @@ def biubiu_secp(api, key1, key2, from, to)
 end
 
 api = CKB::API.new
-key1 = CKB::Key.new("0x1eacee209907437318085d33295fcc721a383f17d4580c76ffc3b62104a2d9b0")
-key2 = CKB::Key.new("0xd51fc5a0d6c1aa5a71af04584e413fdba77185069b3980e5ecf361bd05950fcc")
 #wallet = CKB::Wallet.new(api, key)
 
 if ARGV[0] == 'explode_secp'
