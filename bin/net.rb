@@ -13,6 +13,7 @@ puts "#{local.node_id} #{local.addresses[0].address}"
 peers = api.get_peers
 puts "\n[Peers] #{peers.size}"
 peers.each_with_index do |peer, i|
+  break if i > 9
   puts "(#{i}) #{peer.node_id} #{peer.addresses[0].address}:#{peer.addresses[0].score}"
 end
 
