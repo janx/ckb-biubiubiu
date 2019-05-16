@@ -131,9 +131,11 @@ def biubiu_secp_cells(api, key1, key2, from, to)
   puts "sending #{txs.size} transactions from #{addr1} to #{addr2} ..."
   t1 = Time.now
   txs.each_with_index do |tx, i|
-    puts "sending tx #{i+1}/#{txs.size} ..."
     begin
+      tt1 = Time.now.to_f
       txids << api.send_transaction(tx)
+      tt2 = Time.now.to_f
+      puts "#{i+1}/#{txs.size} sent in #{tt2-tt1}s, begin: #{tt1}, end: #{tt2}"
     rescue
       p $!
     end
