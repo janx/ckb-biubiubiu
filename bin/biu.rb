@@ -201,6 +201,41 @@ def biubiu_secp(api, key1, key2, from, to)
   p txs
 end
 
+def perf(api, from, to)
+  a = from
+  b = to
+  t1 = 0
+  (from...to).each do |i|
+    blk = api.get_block_by_number i
+    if blk.transactions.size > 1
+      a = i
+      t1 = blk.header.timestamp.to_i / 1000.0
+      puts "count begin: ##{a} #{blk.header.hash}"
+      break
+    end
+    puts "skip empty block ##{blk.header.number} #{blk.header.hash}"
+  end
+  count = 0
+  (a...to).each do |i|
+    blk = api.get_block_by_number i
+    if !blk.nil? && blk.transactions.size > 1
+      count += blk.transactions.size
+    else
+      puts "hit empty block ##{blk.header.number} #{blk.header.hash}"
+      b = i-1
+      break
+    end
+  end
+  blk = api.get_block_by_number b
+  puts "count end: ##{b} #{blk.header.hash}"
+  t2 = blk.header.timestamp.to_i / 1000.0
+  adjusted_time = (t2 - t1) * (b - a + 1).to_f / (b - a).to_f
+  tps = count / adjusted_time
+  puts "blocks: #{b-a} txs: #{count}"
+  puts "t1: #{t1} t2: #{t2} duration: #{adjusted_time}"
+  puts "tps: #{tps} txs/s"
+end
+
 api = CKB::API.new
 #wallet = CKB::Wallet.new(api, key)
 
@@ -208,6 +243,8 @@ if ARGV[0] == 'explode_secp'
   explode_secp(api, key1, ARGV[1], ARGV[2])
 elsif ARGV[0] == 'biubiu_secp'
   biubiu_secp(api, key1, key2, ARGV[1], ARGV[2])
+elsif ARGV[0] == 'perf'
+  perf(api, ARGV[1].to_i, ARGV[2].to_i)
 elsif ARGV[0] == 'generate_key'
   p CKB::Key.random_private_key
 end
